@@ -57,7 +57,7 @@ def eval(n, dim=10):
     scores = []
 
     for _ in range(n):
-        env = SnakeEnv(dim=5, headless=False)
+        env = SnakeEnv(dim=dim, headless=True)
 
         alive = True
         game_over = False
@@ -74,4 +74,4 @@ def eval(n, dim=10):
     
     print(sum(scores) / len(scores))
 
-eval(100)
+eval(100, dim=7)

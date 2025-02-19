@@ -4,58 +4,33 @@ import pygame
 import time
 import os
 
-# os.environ['SDL_VIDEO_WINDOW_POS'] = '0,0'
-
-def map_action(action):
-    mapping = ["RIGHT", "LEFT", "UP", "DOWN"]
-    return mapping[action]
-
-def get_direction():
-    
-    print("Press arrow keys or WASD to move. Press 'q' to quit.")
-    
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key in [pygame.K_RIGHT, pygame.K_d]:
-                    return "RIGHT"
-                elif event.key in [pygame.K_LEFT, pygame.K_a]:
-                    return "LEFT"
-                elif event.key in [pygame.K_UP, pygame.K_w]:
-                    return "UP"
-                elif event.key in [pygame.K_DOWN, pygame.K_s]:
-                    return "DOWN"
-                elif event.key == pygame.K_q:  # Quit condition
-                    running = False
-
-    return None
 
 class SnakeEnv:
-    def __init__(self, dim=10, headless=True, rewards=[1, -1, 0.1, -0.01]):
+    """
+    A Snake game environment that can be used for both manual play and reinforcement learning.
+    
+    Parameters:
+        dim (int): Dimension of the square game board
+        headless (bool): Whether to run without pygame visualization
+        rewards (list): List of reward values for [eating fruit, death, movement, distance_to_fruit]
+    """
+    def __init__(self, dim=10, headless=True, rewards=[1, -1, 0.1, -0.01], board_size=800):
         self.dim = dim
         self.headless = headless
         self.rewards = rewards
         self.game_length = 1
+        self.board_size = board_size
 
         # Set snake head
         center = (self.dim + 1)// 2
-        # self.body = [[center, center], [center - 1, center]]
-        # self.dir = 'RIGHT'
-
         directions = {
         'RIGHT': [[center, center], [center - 1, center], [center - 2, center]],
         'LEFT': [[center, center], [center + 1, center], [center + 2, center]],
         'UP': [[center, center], [center, center + 1], [center, center + 2]],
         'DOWN': [[center, center], [center, center - 1], [center, center - 2]],
-        }   
-
+        }
         self.dir = random.choice(list(directions.keys()))
         self.body = directions[self.dir]
-
-        # print(self.dir)
 
         self.all_positions = {(x, y) for x in range(1, self.dim+1) for y in range(1, self.dim+1)}
         self.place_fruit()
@@ -64,13 +39,22 @@ class SnakeEnv:
 
         if self.headless == False:
             pygame.init()
-            self.screen = pygame.display.set_mode((500, 550))
+            self.screen = pygame.display.set_mode((self.board_size, self.board_size + 50))
             self.render()
 
     def death_pygame(self):
+        """
+        Closes the pygame window when snake dies.
+        """
         pygame.quit()
 
     def step_snake(self):
+        """
+        Updates snake position based on current direction.
+        
+        Returns:
+            bool: True if snake ate fruit, False otherwise
+        """
 
         self.game_length += 1
         
@@ -99,6 +83,20 @@ class SnakeEnv:
         return ate_fruit
 
     def step_env(self, dir, print_board = False):
+        """
+        Main game step function that updates game state based on action.
+        
+        Parameters:
+            dir (str or int): Direction to move ('RIGHT', 'LEFT', 'UP', 'DOWN' or 0-3)
+            print_board (bool): Whether to print ASCII representation of board
+        
+        Returns:
+            tuple: (game_won, alive, reward, next_state)
+                - game_won (bool): True if snake fills entire board
+                - alive (bool): False if snake hits wall or itself
+                - reward (float): Reward for current step
+                - next_state (ndarray): New game state representation
+        """
 
         if isinstance(dir, int):
             # print(dir)
@@ -114,14 +112,12 @@ class SnakeEnv:
         next_state = None
 
         if self.body[0] in self.body[1:]:
-            # print(f"GAME OVER - score {self.score}")
             alive = False
             if self.headless == False:
                 self.death_pygame()
             reward = self.rewards[1]
 
         elif self.body[0][0] < 1 or self.body[0][0] > self.dim or self.body[0][1] < 1 or self.body[0][1] > self.dim:
-            # print(f"GAME OVER - score {self.score}")
             alive = False
             if self.headless == False:
                 self.death_pygame()
@@ -136,9 +132,6 @@ class SnakeEnv:
 
             fruit_dist = abs(self.body[0][0] - self.fruit[0]) + abs(self.body[0][1] - self.fruit[1])
             reward += self.rewards[3] * (self.dim * 2 - fruit_dist) / (self.dim * 2 )
-
-
-        # self.score = len(self.body)
 
         if print_board:
             self.print_board()
@@ -156,6 +149,16 @@ class SnakeEnv:
         return game_won, alive, reward, next_state
         
     def get_state(self):
+        """
+        Creates a state representation of the current game board.
+        
+        Returns:
+            ndarray: 4-channel state representation containing:
+                - Channel 0: Snake head position
+                - Channel 1: Snake body positions
+                - Channel 2: Fruit position
+                - Channel 3: Position encoding matrix
+        """
 
         head_state = fill_array(self.dim, self.body[0])
         body_state = fill_array(self.dim, self.body[1:])
@@ -166,9 +169,12 @@ class SnakeEnv:
             for j in range(self.dim):
                 position_state[i,j] = min(i, j, self.dim-i-1, self.dim-j-1) / self.dim
         
-        return np.stack([head_state, body_state, fruit_state, position_state])
+        return np.stack([head_state, body_state, fruit_state])
 
     def place_fruit(self):
+        """
+        Places a new fruit randomly on an empty board position.
+        """
         body_set = {tuple(pos) for pos in self.body}
         available_positions = list(self.all_positions - body_set)
         if available_positions:  # Check if there are available positions
@@ -176,11 +182,14 @@ class SnakeEnv:
             self.fruit = fruit_pos
 
     def print_board(self):
-        # y 3, _, _, _
-        #   2, _, _, _
-        #   1, _, _, _
-        #      1, 2, 3
-        #        x    
+        """
+        Prints ASCII representation of game board.
+        Uses:
+            H: Snake head
+            B: Snake body
+            F: Fruit
+            _: Empty space
+        """ 
         for y in range(self.dim, 0, -1):
             for x in range(1, self.dim + 1):
                 # print([x, y])
@@ -196,13 +205,22 @@ class SnakeEnv:
         print('')
     
     def render(self):
+        """
+        Renders current game state using pygame.
+        Shows:
+            - Blue square: Snake head
+            - Green gradient: Snake body
+            - Red square: Fruit
+            - White grid: Board boundaries
+            - Score display
+        """
         BLACK = (0, 0, 0)
         WHITE = (255, 255, 255)
         RED = (255, 0, 0)
         BLUE = (0, 0, 255)
         
         self.screen.fill(BLACK)
-        cell_size = 480 // self.dim
+        cell_size = (self.board_size - 20) // self.dim
         offset = 10
         
         # Draw grid
@@ -245,7 +263,16 @@ class SnakeEnv:
         pygame.display.flip()
 
 def fill_array(n, coordinates):
-
+    """
+    Creates a binary occupation matrix for given coordinates.
+    
+    Parameters:
+        n (int): Dimension of square matrix
+        coordinates (list): Single [x,y] coordinate or list of [x,y] coordinates
+    
+    Returns:
+        ndarray: n x n binary matrix with 1s at given coordinates
+    """
     arr = np.zeros((n, n), dtype=int)
 
     if isinstance(coordinates[0], list):
@@ -255,6 +282,53 @@ def fill_array(n, coordinates):
         arr[n-coordinates[1], coordinates[0] - 1] = 1
     
     return arr
+
+
+def map_action(action):
+    """
+    Maps integer actions to direction strings.
+    
+    Parameters:
+        action (int): Action index 0-3
+    
+    Returns:
+        str: Corresponding direction ('RIGHT', 'LEFT', 'UP', 'DOWN')
+    """
+    mapping = ["RIGHT", "LEFT", "UP", "DOWN"]
+    return mapping[action]
+
+def get_direction():
+    """
+    Gets keyboard input for manual snake control.
+    
+    Controls:
+        Arrow keys or WASD: Movement
+        Q: Quit game
+    
+    Returns:
+        str: Direction ('RIGHT', 'LEFT', 'UP', 'DOWN') or None if quit
+    """
+    print("Press arrow keys or WASD to move. Press 'q' to quit.")
+    
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key in [pygame.K_RIGHT, pygame.K_d]:
+                    return "RIGHT"
+                elif event.key in [pygame.K_LEFT, pygame.K_a]:
+                    return "LEFT"
+                elif event.key in [pygame.K_UP, pygame.K_w]:
+                    return "UP"
+                elif event.key in [pygame.K_DOWN, pygame.K_s]:
+                    return "DOWN"
+                elif event.key == pygame.K_q:  # Quit condition
+                    running = False
+
+    return None
+
 
 
 # # Manual Loop
