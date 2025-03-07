@@ -1,23 +1,40 @@
 # Snake_AI
 Snake envirnment and RL algorithms
 
-## Features:
-A set of 10 features (shown below) were used as input to the model. All features were normalized to [0, 1] by dividing by the length of the board.
+## Features
 
-[X Distance from Head to Fruit, 
-Y Distance from Head to Fruit, 
-Distance Up to Wall,
-Distance Down to Wall,
-Distance Left to Wall,
-Distance Right to Wall,
-Distance to Closest Body Up,
-Distance to Closest Body Down,
-Distance to Closest Body Left,
-Distance to Closest Body Right]
+The model utilizes a set of **10 features** as input. Each feature is **normalized to [-1,1]** by dividing by the length of the board.
+
+### Input Features:
+- **Head-to-Fruit Distance:**
+  - 📏 **X Distance** (Head - Fruit)
+  - 📏 **Y Distance** (Head - Fruit)
+
+- **Wall Proximity:**
+  - 🔼 **Distance Up** to Wall
+  - 🔽 **Distance Down** to Wall
+  - ◀️ **Distance Left** to Wall
+  - ▶️ **Distance Right** to Wall
+
+- **Body Proximity:**
+  - 🔼 **Distance Up** to Closest Body
+  - 🔽 **Distance Down** to Closest Body
+  - ◀️ **Distance Left** to Closest Body
+  - ▶️ **Distance Right** to Closest Body
 
 ## Rewards
 
-The reward function consists of 3 parts. A positive reward for eating a fruit, a negative reward for dying, and a very small positive reward for staying alive each time step. Initially, a small negative reward was used for each time step to encourage faster completion. However, this was found to encourage the snake to kill itself quickly rather than spend many time steps trying to eat the fruit (at the start of training, the snake is very poor at this). A beta value of < 1 was used to discount future rewards.
+The **reward function** consists of three key components:
+
+- 🍎 **Positive Reward** → Earned when the snake **eats a fruit**  
+- ☠️ **Negative Reward** → Given when the snake **dies**  
+- ⏳ **Small Positive Reward** → Awarded for **staying alive** each time step  
+
+### Initial Adjustment:
+Initially, a **small negative reward** was applied per time step to encourage faster completion. However, this led to an unintended consequence— The snake **learned to kill itself quickly** instead of spending time searching for fruit (especially in early training, where its performance was poor).
+
+### Discounting Future Rewards:
+A **beta value < 1** was used to **discount future rewards**, ensuring the model prioritizes **immediate rewards** over long-term speculative gains.
 
 ## Advantage Actor Critic (A2C)
 
@@ -59,5 +76,19 @@ To encourage exploration and prevent premature convergence to suboptimal policie
 ![Max Score vs Epoch](assets/max_score.png)
 ![Average Game Length vs Epoch](assets/game_length.png)
 
-### Results
+## Results
+
+The model successfully learns to:  
+- Avoid **illegal moves** (e.g., turning 180° instantly)  
+- Prevent **collisions** with walls and its own body  
+- **Efficiently** navigate the board to collect fruit  
+
+### Performance on a 7×7 Board:
+- **Average Score:** 17  
+- **Maximum Score:** 43
+
 ![7x7 Inference Example](assets/snake_inference_5games_dim7_20250224-144940.gif)
+
+### Limitations
+
+The chosen feature set introduces some inherent limitations. Since most of the snake's body is outside its field of view, two different positions, each with different optimal moves, can be represented by the same feature set. This lack of full observability can lead to suboptimal decision-making.
